@@ -8,7 +8,7 @@
     "tsBuildInfoFile": "../dist/examples.tsbuildinfo",
     "baseUrl": ".",
     "paths": {
-      "retracker": ["../dist"]
+      "@jonigata/retracker": ["../dist"]
     }
   },
   "include": ["./**/*.ts"],

@@ -1,4 +1,4 @@
-import { createTracker } from 'retracker';
+import { createTracker } from '@jonigata/retracker';
 
 async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
