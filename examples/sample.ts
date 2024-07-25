@@ -5,7 +5,7 @@ async function sleep(ms: number) {
 }
 
 async function main() {
-  const { tr } = await createTracker({ verbose: true });
+  const { tr, truncate } = await createTracker({ verbose: true });
 
   async function task1(x: number) {
     console.log(`Task 1 processing ${x}...`);

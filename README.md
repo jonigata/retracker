@@ -1,12 +1,14 @@
 # Retracker
 
-Retracker is a development tool for Node.js that helps you manage and resume long-running processes. It's designed to save time during development by remembering the state of your operations, allowing you to pick up where you left off if your process is interrupted.
+Retracker is a development tool for Node.js that helps you manage and resume long-running processes. It's designed to save time during development by remembering the sequence of function calls, allowing you to pick up where you left off if your process is interrupted.
 
 ## Key Concepts
 
 - Retracker works similarly to Docker in that it tracks the history of function calls and their arguments.
-- It doesn't cache return values of functions. Instead, it remembers the sequence of operations.
+- It remembers the sequence of operations, not the return values of functions.
 - If a function is called with different arguments than what's in the history, Retracker will "break" at that point and re-execute from there.
+- Retracker only tracks the inputs and outputs of the functions it wraps. It cannot track or reproduce side effects or destructive operations that occur within these functions. Such operations are outside the scope of Retracker's functionality.
+- The effectiveness of Retracker relies on the tracked functions being pure or having minimal side effects. Functions that modify global state or perform I/O operations may not behave as expected when replayed.
 
 ## Installation
 
@@ -30,107 +32,126 @@ async function sleep(ms) {
 async function main() {
   const { tr } = await createTracker({ dbPath: './retracker.sqlite', verbose: true });
 
-  const task1 = tr(async (x) => {
+  async function task1(x) {
     console.log(`Task 1 processing ${x}...`);
     await sleep(2000);
     return x * 2;
-  });
+  }
 
-  const task2 = tr(async (x) => {
+  async function task2(x) {
     console.log(`Task 2 processing ${x}...`);
     await sleep(1500);
     return x + 10;
-  });
+  }
 
-  const task3 = tr(async (x) => {
+  async function task3(x) {
     console.log(`Task 3 processing ${x}...`);
     await sleep(1000);
     return x.toString().repeat(3);
-  });
+  }
 
-  console.log(await task1(5));
-  console.log(await task2(7));
-  console.log(await task3(9));
-  console.log(await task1(5));  // This should be instant on subsequent runs
-  console.log(await task2(8));  // This will re-run as the input is different
+  console.log(await tr(task1)(5));
+  console.log(await tr(task2)(7));
+  console.log(await tr(task3)(9));
+  console.log(await tr(task1)(5));  // This will execute again as it's a new call in the sequence
+  console.log(await tr(task2)(8));  // This will execute as it has different arguments
 }
 
 main();
 ```
 
-When you run this script for the first time, you might see output like this:
+When you run this script for the first time, all tasks will execute. On subsequent runs, Retracker will skip the execution of tasks that match the recorded history, unless the inputs change.
+
+### 1st time
 
 ```
 track task1: (5)
-   --- start:
+   --- start: 
 Task 1 processing 5...
    --- result: 10
+
 10
 track task2: (7)
-   --- start:
+   --- start: 
 Task 2 processing 7...
    --- result: 17
+
 17
 track task3: (9)
-   --- start:
+   --- start: 
 Task 3 processing 9...
    --- result: "999"
+
 999
 track task1: (5)
-   --- reuse: 10
+   --- start: 
+Task 1 processing 5...
+   --- result: 10
+
 10
 track task2: (8)
-   --- start:
+   --- start: 
 Task 2 processing 8...
    --- result: 18
+
 18
 ```
 
-If you run the script again without changing anything, you'll see:
+
+### 2nd time
 
 ```
 track task1: (5)
    --- reuse: 10
+
 10
 track task2: (7)
    --- reuse: 17
+
 17
 track task3: (9)
    --- reuse: "999"
+
 999
 track task1: (5)
    --- reuse: 10
+
 10
 track task2: (8)
    --- reuse: 18
+
 18
 ```
 
-Notice how all tasks are now instant, as Retracker is using the saved history.
-
-If you modify the script to change an input (e.g., change `task1(5)` to `task1(6)`), you'll see:
+### after truncated(changed) script
 
 ```
-track task1: (6)
-   --- start:
-Task 1 processing 6...
-   --- result: 12
-12
+track task1: (5)
+   --- reuse: 10
+
+10
 track task2: (7)
    --- reuse: 17
+
 17
 track task3: (9)
    --- reuse: "999"
+
 999
-track task1: (6)
-   --- reuse: 12
-12
+track task1: (5)
+truncate from here, task1(5): 
+   --- start: 
+Task 1 processing 5...
+   --- result: 10
+
+10
 track task2: (8)
-   --- reuse: 18
+   --- start: 
+Task 2 processing 8...
+   --- result: 18
+
 18
 ```
-
-This demonstrates how Retracker re-runs tasks when inputs change, but continues to use saved results for unchanged inputs.
 
 ## Features
 
@@ -154,11 +175,15 @@ Returns an object with the following methods:
 - `tr`: Track a function
 - `trm`: Track a method
 - `tro`: Track all methods of an object
-- `truncate`: Clear the tracking history
+- `truncate`: Truncate the tracking history from the current point
 
 ### `protect(value)`
 
 Prevents a value from being recorded in the history.
+
+### `truncate()`
+
+Truncates the tracking history from the current point onwards. Useful for creating new branches in your execution history.
 
 ## Use Cases
 
