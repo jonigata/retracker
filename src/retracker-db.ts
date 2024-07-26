@@ -1,4 +1,38 @@
-import { UniversalSQLite } from 'universal-sqlite';
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
+
+export class UniversalSQLite {
+  private dbPath: string;
+  private db: any;
+
+  constructor(dbPath = './database.sqlite') {
+    this.dbPath = dbPath;
+    this.db = null;
+  }
+
+  async init() {
+    if (!this.db) {
+      this.db = await open({filename: this.dbPath,driver: sqlite3.Database});
+    }
+  }
+
+  async execute(query: string, params: any[] = []) {
+    if (!this.db) throw new Error("Database is not initialized");
+    await this.db.run(query, params);
+  }
+
+  async query<T = any>(query: string, params?: any[]): Promise<T[]> {
+    if (!this.db) throw new Error("Database is not initialized");
+    return this.db.all(query, params);
+  }
+
+  async close() {
+    if (this.db) {
+      await this.db.close();
+      this.db = null;
+    }
+  }
+}
 
 export class RetrackerDB {
   private db: UniversalSQLite;
