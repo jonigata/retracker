@@ -5,11 +5,13 @@ describe('Retracker', () => {
   let retracker: Retracker;
 
   beforeEach(async () => {
-    retracker = new Retracker(new RetrackerDB(':memory:'));
+    const db = new RetrackerDB(':memory:');
+    retracker = new Retracker(db);
     await retracker.init();
   });
 
   it('basic functionality and execution order', async () => {
+    console.log("starting test");
     const testFn = (x: number) => x * 2;
     const trackedFn = retracker.track(testFn);
 

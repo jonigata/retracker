@@ -2,6 +2,9 @@ import { open, Database } from 'sqlite';
 import sqlite3 from 'sqlite3';
 import colors from 'ansi-colors';
 import { snugJSON } from "snug-json";
+import { UniversalSQLite as RetrackerDB } from 'universal-sqlite';
+
+export { RetrackerDB }
 
 function stringify(obj: any) {
   return snugJSON(obj, { 
@@ -84,46 +87,6 @@ export function protect<T>(value: T): Protected<T> {
   return new Protected(value);
 }
 
-export class RetrackerDB {
-  private static db: Database | null = null;
-
-  constructor(private dbPath: string = './retracker.sqlite') {}
-
-  async init(): Promise<void> {
-    if (!RetrackerDB.db) {
-      RetrackerDB.db = await open({
-        filename: this.dbPath,
-        driver: sqlite3.Database
-      });
-      await RetrackerDB.db.exec(`
-        CREATE TABLE IF NOT EXISTS function_calls (
-          call_number INTEGER PRIMARY KEY,
-          function_name TEXT,
-          args TEXT,
-          result TEXT
-        );
-      `);
-    }
-  }
-
-  async execute(query: string, params: any[] = []): Promise<void> {
-    if (!RetrackerDB.db) throw new Error("Database not initialized");
-    await RetrackerDB.db.run(query, params);
-  }
-
-  async query<T extends any[]>(query: string, params: any[] = []): Promise<T> {
-    if (!RetrackerDB.db) throw new Error("Database not initialized");
-    return RetrackerDB.db.all(query, params) as Promise<T>;
-  }
-
-  async close(): Promise<void> {
-    if (RetrackerDB.db) {
-      await RetrackerDB.db.close();
-      RetrackerDB.db = null;
-    }
-  }
-}
-
 export class Retracker {
   private db: RetrackerDB | null;
   private currentHistory: number[] = [];
@@ -136,6 +99,14 @@ export class Retracker {
 
   async init(): Promise<void> {
     await this.db?.init();
+    await this.db?.execute(`
+      CREATE TABLE IF NOT EXISTS function_calls (
+        call_number INTEGER PRIMARY KEY,
+        function_name TEXT,
+        args TEXT,
+        result TEXT
+      );
+    `);
     await this.loadHistory();
   }
 
