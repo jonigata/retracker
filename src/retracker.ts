@@ -1,8 +1,10 @@
 import colors from 'ansi-colors';
 import { snugJSON } from "snug-json";
-import { UniversalSQLite as RetrackerDB } from 'universal-sqlite';
+import { RetrackerDB } from './retracker-db';
 
 export { RetrackerDB }
+
+const defaultDbName = './retracker.sqlite';
 
 function stringify(obj: any) {
   return snugJSON(obj, { 
@@ -86,47 +88,35 @@ export function protect<T>(value: T): Protected<T> {
 }
 
 export class Retracker {
-  private db: RetrackerDB | null;
+  private db: RetrackerDB;
   private currentHistory: number[] = [];
-  private callCounter: number = 0;
+  private callCounter: number = -1;
   private lastCallWasFromDB: boolean = false;
 
-  constructor(db?: RetrackerDB, private options: Options = { verbose: false, dbPath: './retracker.sqlite' }) {
-    this.db = db ?? new RetrackerDB(options.dbPath);
+  constructor(db?: RetrackerDB, private options: Options = { verbose: false, dbPath: defaultDbName }) {
+    this.db = db ?? new RetrackerDB(options.dbPath ?? defaultDbName);
   }
 
   async init(): Promise<void> {
-    await this.db?.init();
-    await this.db?.execute(`
-      CREATE TABLE IF NOT EXISTS function_calls (
-        call_number INTEGER PRIMARY KEY,
-        function_name TEXT,
-        args TEXT,
-        result TEXT
-      );
-    `);
+    await this.db.init();
     await this.loadHistory();
-  }
-
-  private async loadHistory(): Promise<void> {
-    if (!this.db) throw new Error("Database not initialized");
-    
-    const rows = await this.db.query<{ call_number: number }[]>("SELECT call_number FROM function_calls ORDER BY call_number");
-    this.currentHistory = rows.map(row => row.call_number);
     this.callCounter = 0;
   }
 
-  track<T extends AnyFunction>(
-    fn: T
-  ): TrackerFunction<T> {
-    function stringifyShortArgs(args: any[]) {
-      return args.map(stringifyShort).join(', ');
-    }
-  
+  private async loadHistory(): Promise<void> {
+    const rows = await this.db.query<{ call_number: number }>("SELECT call_number FROM function_calls ORDER BY call_number");
+    this.currentHistory = rows.map(row => row.call_number);
+  }
+
+  track<T extends AnyFunction>(fn: T): TrackerFunction<T> {
     return async (...args: ProtectableArray<Parameters<T>>): Promise<Awaited<ReturnType<T>>> => {
+      if (this.callCounter < 0) {
+        throw new Error("Retracker not initialized. Call init() first.");
+      }
+
       const currentCallNumber = this.callCounter++;
-  
-      this.verbose(`track ${fn.name}:`, `(${stringifyShortArgs(args)})`);
+      
+      this.verbose(`track ${fn.name}:`, `(${args.map(stringifyShort).join(', ')})`);
       if (currentCallNumber < this.currentHistory.length) {
         const historicalCall = await this.getHistoricalCall(currentCallNumber);
         if (historicalCall && 
@@ -199,7 +189,7 @@ export class Retracker {
 
   private async getHistoricalCall(callNumber: number): Promise<{ functionName: string, args: any[], result: any } | null> {
     if (!this.db) throw new Error("Database not initialized");
-    const rows = await this.db.query<{ function_name: string, args: string, result: string }[]>(
+    const rows = await this.db.query<{ function_name: string, args: string, result: string }>(
       "SELECT function_name, args, result FROM function_calls WHERE call_number = ?",
       [callNumber]
     );
@@ -244,9 +234,9 @@ export class Retracker {
   }
   
   async close(): Promise<void> {
-    if (this.db) {
+    if (0 <= this.callCounter) {
       await this.db.close();
-      this.db = null;
+      this.callCounter = -1;
     }
   }
 
@@ -266,7 +256,7 @@ export const createTracker: CreateTracker = async (options) => {
     console.warn("Warning: Using an in-memory database. Data will not be persisted.");
   }
   
-  const db = new RetrackerDB(options.dbPath);
+  const db = new RetrackerDB(options.dbPath ?? defaultDbName);
   const retracker = new Retracker(db, options);
   await retracker.init();
 

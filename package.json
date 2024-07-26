@@ -1,6 +1,6 @@
 {
   "name": "@jonigata/retracker",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Retracker is a development tool for Node.js that helps you manage and resume long-running processes.",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -55,6 +55,6 @@
     "snug-json": "^0.0.3",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
-    "universal-sqlite": "^0.0.6"
+    "universal-sqlite": "^0.0.8"
   }
 }
