@@ -1,5 +1,3 @@
-import { open, Database } from 'sqlite';
-import sqlite3 from 'sqlite3';
 import colors from 'ansi-colors';
 import { snugJSON } from "snug-json";
 import { UniversalSQLite as RetrackerDB } from 'universal-sqlite';
