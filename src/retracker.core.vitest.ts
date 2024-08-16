@@ -31,8 +31,21 @@ describe('Retracker', () => {
     expect(result4).toBe(10);
     expect(retracker.wasLastCallFromDB()).toBe(false);
 
+    retracker.failNext(() => new Error('Test error'));
+    // next call should fail, throwing an error
+    try {
+      await trackedFn(5);
+    } catch (e: any) {
+      expect(e.message).toBe('Test error');
+    }
+
+    // next call should succeed
+    const result5 = await trackedFn(5);
+    expect(result5).toBe(10);
+    expect(retracker.wasLastCallFromDB()).toBe(false);
+
     const history = await retracker.getHistory();
-    expect(history.length).toBe(4);
+    expect(history.length).toBe(5);
   });
 
   it('trackMethod', async () => {

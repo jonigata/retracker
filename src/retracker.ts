@@ -92,6 +92,7 @@ export class Retracker {
   private currentHistory: number[] = [];
   private callCounter: number = -1;
   private lastCallWasFromDB: boolean = false;
+  private nextCallIsError: null | (() => Error) = null;
 
   constructor(db?: RetrackerDB, private options: Options = { verbose: false, dbPath: defaultDbName }) {
     this.db = db ?? new RetrackerDB(options.dbPath ?? defaultDbName);
@@ -115,6 +116,11 @@ export class Retracker {
       }
 
       const currentCallNumber = this.callCounter++;
+      if (this.nextCallIsError) {
+        const error = this.nextCallIsError();
+        this.nextCallIsError = null;
+        throw error;
+      }
       
       this.verbose(`track ${fn.name}:`, `(${args.map(stringifyShort).join(', ')})`);
       if (currentCallNumber < this.currentHistory.length) {
@@ -249,6 +255,10 @@ export class Retracker {
       console.log(colors.green(s), colors.gray(args));
     }
   }
+
+  failNext(error: () => Error): void {
+    this.nextCallIsError = error;
+  }
 }
 
 export const createTracker: CreateTracker = async (options) => {
@@ -264,6 +274,7 @@ export const createTracker: CreateTracker = async (options) => {
     tr: retracker.track.bind(retracker),
     trm: retracker.trackMethod.bind(retracker),
     tro: retracker.trackObject.bind(retracker),
-    truncate: retracker.truncate.bind(retracker)
+    truncate: retracker.truncate.bind(retracker),
+    failNext: retracker.failNext.bind(retracker)
   };
 };

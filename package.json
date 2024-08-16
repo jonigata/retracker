@@ -1,6 +1,6 @@
 {
   "name": "@jonigata/retracker",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Retracker is a development tool for Node.js that helps you manage and resume long-running processes.",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
